@@ -36,7 +36,7 @@ kpi_config = {
     },
     "QCSR_Minutes2Days": {
         "question": "Minutes circulated within two (2) business days from the date of the QCRS",
-        "valid": ["Yes", "QCSR not scheduled for the current month"]
+        "valid": ["Yes", "QCSR not scheduled for current month"]
     },
     "QCSR_DocsSaved5Days": {
         "question": "Documents saved on the Vodacom SharePoint Site within 5 days of QCRS",
