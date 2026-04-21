@@ -27,7 +27,8 @@ kpi_config = {
             "During the previous 3 Months",
             "Scheduled in the next 2 months",
             "Customer Declined/Postponed QCSR",
-            "QCSR not a customer requirement"
+            "QCSR not a customer requirement",
+            "Customer Declined / Postponed QCSR"
         ]
     },
     "QCSR_PrepWeekPrior": {
