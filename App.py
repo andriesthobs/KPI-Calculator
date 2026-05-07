@@ -3,11 +3,11 @@ import pandas as pd
 import io
 
 # ===================================
-# KPI CONFIGURATION (STANDARDISED)
+# ✅ FULL KPI CONFIG (ALL KPIs)
 # ===================================
 kpi_config = {
     "SMR_Submitted_6to8": {
-        "question": "Service Management Report submitted between 6th and 8th day of the immediately following month",
+        "question": "Service Management Report submitted between 6th and 8th day",
         "valid": ["yes"]
     },
     "MSM_Conducted": {
@@ -15,19 +15,51 @@ kpi_config = {
         "valid": ["yes", "cancelled"]
     },
     "Minutes_Within2Days": {
-        "question": "Minutes circulated within two (2) business days from the date of the Service Management meeting",
+        "question": "Minutes circulated within 2 business days",
         "valid": ["yes", "cancelled"]
     },
     "Docs_Saved_5Days": {
-        "question": "Meeting Minutes and/or Monthly Report saved within 5 days",
+        "question": "Documents saved within 5 days",
         "valid": ["yes"]
+    },
+    "QCSR_Conducted": {
+        "question": "Quarterly Customer Service Review conducted",
+        "valid": ["yes", "cancelled", "not_required"]
+    },
+    "QCSR_PrepWeekPrior": {
+        "question": "Preparatory meeting conducted",
+        "valid": ["yes", "not_required"]
+    },
+    "QCSR_Minutes2Days": {
+        "question": "QCSR minutes within 2 days",
+        "valid": ["yes", "not_required"]
+    },
+    "QCSR_DocsSaved5Days": {
+        "question": "QCSR docs saved within 5 days",
+        "valid": ["yes", "not_required"]
+    },
+    "WeeklyReport_SentByTue": {
+        "question": "Weekly report sent by Tuesday",
+        "valid": ["yes", "not_required"]
+    },
+    "SIPs_Updated": {
+        "question": "SIPs updated",
+        "valid": ["yes"]
+    },
+    "CSIR_Prepared_OnTime": {
+        "question": "CSIR prepared on time",
+        "valid": ["yes", "not_required"]
+    },
+    "CSIR_Meeting_5Days": {
+        "question": "CSIR meeting within 5 days",
+        "valid": ["yes", "not_required"]
     }
 }
 
 # ===================================
-# NORMALISATION FUNCTION (CRITICAL FIX)
+# ✅ NORMALISATION FUNCTION (ROBUST)
 # ===================================
-def normalize_value(val):
+def normalize(val):
     val = str(val).strip().lower()
 
     if val in ["yes"]:
@@ -36,129 +68,103 @@ def normalize_value(val):
     if val in ["no"]:
         return "no"
 
-    if val in [
-        "customer cancelled meeting",
-        "customer cancelled meeting ",
-        "customer cancelled meeting",
-        "meeting cancelled",
-        "cancelled",
-        "customer did not attend",
-        "no meeting held",
-        "did not join"
-    ]:
+    if any(x in val for x in [
+        "cancel", "did not attend", "no meeting", "not held"
+    ]):
         return "cancelled"
 
-    if val in [
-        "not a customer requirement",
-        "not required",
-        "no requirement"
-    ]:
+    if any(x in val for x in [
+        "not required", "no requirement", "not a requirement"
+    ]):
         return "not_required"
 
-    if val in ["", "nan", "none"]:
+    if val in ["nan", "", "none"]:
         return "blank"
 
     return "other"
 
+# ===================================
+# ✅ VALID POPULATION
+# ===================================
+VALID_SET = ["yes", "no", "cancelled", "not_required"]
 
 # ===================================
-# VALID POPULATION FILTER
+# STREAMLIT
 # ===================================
-def get_valid_population(series):
-    return series[series.isin(["yes", "no", "cancelled", "not_required"])]
+st.set_page_config(page_title="KPI Dashboard", layout="wide")
+st.title("📊 Nexio KPI Dashboard")
 
+file = st.file_uploader("Upload Excel", type=["xlsx"])
 
-# ===================================
-# STREAMLIT UI
-# ===================================
-st.set_page_config(page_title="📊 Nexio KPI Dashboard", layout="wide")
+if file:
+    df = pd.read_excel(file, sheet_name="tblNexioKPI", engine="openpyxl")
 
-st.title("📊 Nexio KPI Analytics Dashboard")
+    month = st.selectbox("Select Month", sorted(df["KPIMonth"].dropna().unique()))
+    df = df[df["KPIMonth"] == month]
 
-uploaded_file = st.file_uploader("Upload KPI Excel File", type=["xlsx"])
-
-# ===================================
-# PROCESS FILE
-# ===================================
-if uploaded_file:
-    df = pd.read_excel(uploaded_file, sheet_name="tblNexioKPI", engine="openpyxl")
-
-    months = sorted(df["KPIMonth"].dropna().unique())
-    selected_month = st.selectbox("Select KPI Month", months)
-
-    df_month = df[df["KPIMonth"] == selected_month]
-
-    # ===================================
-    # KPI CALCULATION
-    # ===================================
     total_correct = 0
     total_possible = 0
-    export_rows = []
 
-    for col, config in kpi_config.items():
+    debug_data = []
 
-        with st.expander(f"🔹 {config['question']}"):
+    for col, cfg in kpi_config.items():
 
-            if col in df_month.columns:
+        st.subheader(cfg["question"])
 
-                # ✅ Normalize column values
-                normalized = df_month[col].apply(normalize_value)
+        if col not in df.columns:
+            st.error(f"Missing column: {col}")
+            continue
 
-                # ✅ Filter valid population
-                valid_population = get_valid_population(normalized)
+        series = df[col].apply(normalize)
 
-                total = len(valid_population)
+        # ✅ CLEAN population
+        valid_pop = series[series.isin(VALID_SET)]
 
-                # ✅ Count correct
-                correct = valid_population.isin(config["valid"]).sum()
+        total = len(valid_pop)
 
-                percent = round((correct / total) * 100, 2) if total > 0 else 0
+        # ✅ FIX: normalize VALID values ALSO
+        valid_values = [v.lower() for v in cfg["valid"]]
 
-                # ✅ Aggregate totals (FIXED!)
-                total_correct += correct
-                total_possible += total
+        correct = valid_pop.isin(valid_values).sum()
 
-                # ✅ UI display
-                st.metric("KPI Score", f"{percent}%")
-                st.write(f"Valid PASS values: {config['valid']}")
-                st.write(f"Correct: {correct} / {total}")
+        percent = round((correct / total) * 100, 2) if total else 0
 
-                # ✅ Store export data
-                export_rows.append({
-                    "KPI Question": config["question"],
-                    "Score (%)": percent,
-                    "Correct": correct,
-                    "Total": total
-                })
+        total_correct += correct
+        total_possible += total
 
-            else:
-                st.error(f"Missing column: {col}")
+        st.write(f"Score: {percent}%")
+        st.write(f"{correct} / {total}")
+
+        # ✅ DEBUG (very important)
+        debug_counts = series.value_counts()
+
+        debug_data.append({
+            "KPI": col,
+            "Total Rows": len(series),
+            "Valid Rows": total,
+            "Breakdown": dict(debug_counts)
+        })
 
     # ===================================
-    # ✅ CORRECT OVERALL KPI (WEIGHTED)
+    # ✅ CORRECT OVERALL KPI
     # ===================================
-    overall = round((total_correct / total_possible) * 100, 2) if total_possible > 0 else 0
+    overall = round((total_correct / total_possible) * 100, 2) if total_possible else 0
 
-    st.subheader("⭐ Overall KPI Performance")
-    st.metric("Overall KPI Score", f"{overall}%")
-    st.write(f"Overall: {total_correct} / {total_possible}")
+    st.header("⭐ Overall KPI")
+    st.metric("Overall Score", f"{overall}%")
+    st.write(f"{total_correct} / {total_possible}")
+
+    # ===================================
+    # ✅ DEBUG VIEW (THIS WILL SHOW YOUR ISSUE CLEARLY)
+    # ===================================
+    with st.expander("🔍 Data Debug View"):
+        st.write(pd.DataFrame(debug_data))
 
     # ===================================
     # EXPORT
     # ===================================
-    export_df = pd.DataFrame(export_rows)
-    export_df.loc[len(export_df.index)] = ["Overall Score", overall, total_correct, total_possible]
+    output = io.BytesIO()
 
-    buffer = io.BytesIO()
+    pd.DataFrame(debug_data).to_excel(output, index=False)
 
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        export_df.to_excel(writer, index=False)
-
-    st.download_button(
-        label="⬇ Download KPI Results",
-        data=buffer.getvalue(),
-        file_name=f"KPI_Results_{selected_month}.xlsx"
-    )
-
-else:
-    st.info("Upload your KPI Excel file to begin.")
+    st.download_button("Download Debug Data", output.getvalue(), "debug.xlsx")
