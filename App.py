@@ -46,7 +46,7 @@ kpi_config = {
         "question": "Physical preparatory meeting conducted a week prior to the QCSR",
         "valid": [
             "Yes",
-            "QCSR not Scheduled for the current Month"
+            "QCSR not Scheduled for current Month"
         ]
     },
     "QCSR_Minutes2Days": {
