@@ -87,7 +87,7 @@ kpi_config = {
         "question": "Documents saved on the Vodacom SharePoint Site within 5 days of QCRS",
         "valid": [
             "Yes",
-            "QCSR not scheduled for the current Month"
+            "qcsr not scheduled for current month"
         ]
     },
     "WeeklyReport_SentByTue": {
