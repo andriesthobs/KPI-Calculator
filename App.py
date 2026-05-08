@@ -108,7 +108,7 @@ kpi_config = {
         "question": "Customer Specific Incident Report (CSIR) prepared and distributed 72 calendar hours or 24 business hours",
         "valid": [
             "Yes",
-            "No Incidents Reports for the month"
+            "no incident reports for the month"
         ]
     },
     "CSIR_Meeting_5Days": {
