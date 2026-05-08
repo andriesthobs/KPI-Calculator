@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import re
 
 # ===================================
 # PAGE CONFIG
@@ -10,6 +11,32 @@ st.set_page_config(
     page_icon="📊",
     layout="wide"
 )
+
+# ===================================
+# TEXT NORMALIZATION FUNCTION
+# Makes comparisons user-friendly
+# ===================================
+def normalize_text(value):
+
+    if pd.isna(value):
+        return ""
+
+    value = str(value)
+
+    # Remove leading/trailing spaces
+    value = value.strip()
+
+    # Convert to lowercase
+    value = value.lower()
+
+    # Remove extra spaces/tabs/newlines
+    value = re.sub(r"\s+", " ", value)
+
+    # Remove dots and commas
+    value = re.sub(r"[.,]", "", value)
+
+    return value
+
 
 # ===================================
 # KPI CONFIGURATION
@@ -46,7 +73,7 @@ kpi_config = {
         "question": "Physical preparatory meeting conducted a week prior to the QCSR",
         "valid": [
             "Yes",
-            "QCSR not Scheduled for current Month"
+            "QCSR not Scheduled for the current Month"
         ]
     },
     "QCSR_Minutes2Days": {
@@ -94,7 +121,7 @@ kpi_config = {
 }
 
 # ===================================
-# PAGE TITLE
+# TITLE
 # ===================================
 st.title("📊 Nexio KPI Analytics Dashboard")
 
@@ -158,7 +185,7 @@ if uploaded_file:
         df = df.drop_duplicates()
 
     # ===================================
-    # MONTH SELECTION
+    # MONTHS
     # ===================================
     months = sorted(
         df["KPIMonth"]
@@ -172,7 +199,7 @@ if uploaded_file:
     )
 
     # ===================================
-    # FILTER MONTH
+    # FILTER DATA
     # ===================================
     df_month = df[
         df["KPIMonth"] == selected_month
@@ -188,13 +215,12 @@ if uploaded_file:
     )
 
     # ===================================
-    # TOTAL MONTH RECORDS
+    # TOTAL RECORDS
     # ===================================
     month_total_records = len(df_month)
 
     st.info(
-        f"📄 Total KPI Records for {selected_month}: "
-        f"{month_total_records}"
+        f"📄 Total KPI Records: {month_total_records}"
     )
 
     # ===================================
@@ -214,44 +240,34 @@ if uploaded_file:
 
         with st.expander(f"🔹 {question}"):
 
-            # ===================================
-            # COLUMN CHECK
-            # ===================================
             if col not in df_month.columns:
 
                 st.error(f"Column missing: {col}")
                 continue
 
             # ===================================
-            # CLEAN KPI DATA
+            # NORMALIZE COLUMN VALUES
             # ===================================
             normalized_series = (
                 df_month[col]
-                .fillna("")
-                .astype(str)
-                .str.strip()
-                .str.replace(r"\s+", " ", regex=True)
-                .str.lower()
+                .apply(normalize_text)
             )
 
             # ===================================
-            # CLEAN VALID VALUES
+            # NORMALIZE VALID VALUES
             # ===================================
             normalized_valid = [
-                v.lower().strip()
+                normalize_text(v)
                 for v in valid_values
             ]
 
             # ===================================
-            # CORRECT RECORDS
+            # CORRECT COUNT
             # ===================================
             correct = normalized_series.isin(
                 normalized_valid
             ).sum()
 
-            # ===================================
-            # USE FIXED TOTAL
-            # ===================================
             total = month_total_records
 
             # ===================================
@@ -297,7 +313,6 @@ if uploaded_file:
                 ~normalized_series.isin(normalized_valid)
             ]
 
-            # REMOVE BLANKS FROM INVALIDS
             invalid_entries = invalid_entries[
                 invalid_entries != ""
             ]
@@ -368,7 +383,7 @@ if uploaded_file:
     )
 
     # ===================================
-    # EXPORT TO EXCEL
+    # EXPORT EXCEL
     # ===================================
     st.subheader("📁 Export KPI Results")
 
