@@ -115,7 +115,7 @@ kpi_config = {
         "question": "Meeting conducted within 5 business days after CSIR release",
         "valid": [
             "Yes",
-            "No Incidents Reports for the month"
+            "no incident reports for the month"
         ]
     }
 }
