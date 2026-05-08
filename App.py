@@ -44,42 +44,66 @@ kpi_config = {
     },
     "QCSR_PrepWeekPrior": {
         "question": "Physical preparatory meeting conducted a week prior to the QCSR",
-        "valid": ["Yes", "QCSR not Scheduled for current Month"]
+        "valid": [
+            "Yes",
+            "QCSR not Scheduled for the current Month"
+        ]
     },
     "QCSR_Minutes2Days": {
         "question": "Minutes circulated within two (2) business days from the date of the QCRS",
-        "valid": ["Yes", "QCRS not scheduled for current month"]
+        "valid": [
+            "Yes",
+            "QCRS not scheduled for current month"
+        ]
     },
     "QCSR_DocsSaved5Days": {
         "question": "Documents saved on the Vodacom SharePoint Site within 5 days of QCRS",
-        "valid": ["Yes", "QCSR not scheduled for the current Month"]
+        "valid": [
+            "Yes",
+            "QCSR not scheduled for the current Month"
+        ]
     },
     "WeeklyReport_SentByTue": {
         "question": "Weekly Report forwarded electronically to the customer by no later than the Tuesday immediately following the end of the week",
-        "valid": ["Yes", "Not a customer requirement"]
+        "valid": [
+            "Yes",
+            "Not a customer requirement"
+        ]
     },
     "SIPs_Updated": {
         "question": "SIPS initiated and updated as indicated by the process requirements",
-        "valid": ["Yes", "No Missed SLA"]
+        "valid": [
+            "Yes",
+            "No Missed SLA"
+        ]
     },
     "CSIR_Prepared_OnTime": {
         "question": "Customer Specific Incident Report (CSIR) prepared and distributed 72 calendar hours or 24 business hours",
-        "valid": ["Yes", "No Incidents Reports for the month"]
+        "valid": [
+            "Yes",
+            "No Incidents Reports for the month"
+        ]
     },
     "CSIR_Meeting_5Days": {
         "question": "Meeting conducted within 5 business days after CSIR release",
-        "valid": ["Yes", "No Incidents Reports for the month"]
+        "valid": [
+            "Yes",
+            "No Incidents Reports for the month"
+        ]
     }
 }
 
 # ===================================
-# TITLE
+# PAGE TITLE
 # ===================================
 st.title("📊 Nexio KPI Analytics Dashboard")
-st.write("Upload the KPI Excel file and analyze monthly KPI performance.")
+
+st.write(
+    "Upload the KPI Excel file and analyze monthly KPI performance."
+)
 
 # ===================================
-# FILE UPLOAD
+# FILE UPLOADER
 # ===================================
 uploaded_file = st.file_uploader(
     "Upload KPI Excel File",
@@ -92,23 +116,28 @@ uploaded_file = st.file_uploader(
 if uploaded_file:
 
     try:
+
         df = pd.read_excel(
             uploaded_file,
             sheet_name="tblNexioKPI"
         )
 
     except Exception as e:
-        st.error(f"Error loading file: {e}")
+
+        st.error(f"Error loading Excel file: {e}")
+        st.stop()
+
+    # ===================================
+    # CHECK KPIMonth COLUMN
+    # ===================================
+    if "KPIMonth" not in df.columns:
+
+        st.error("KPIMonth column not found.")
         st.stop()
 
     # ===================================
     # CLEAN KPIMonth
     # ===================================
-    if "KPIMonth" not in df.columns:
-        st.error("KPIMonth column not found.")
-        st.stop()
-
-    # Normalize KPIMonth
     df["KPIMonth"] = (
         df["KPIMonth"]
         .astype(str)
@@ -121,13 +150,21 @@ if uploaded_file:
     duplicate_count = df.duplicated().sum()
 
     if duplicate_count > 0:
-        st.warning(f"⚠ {duplicate_count} duplicate rows detected and removed.")
+
+        st.warning(
+            f"⚠ {duplicate_count} duplicate rows detected and removed."
+        )
+
         df = df.drop_duplicates()
 
     # ===================================
     # MONTH SELECTION
     # ===================================
-    months = sorted(df["KPIMonth"].dropna().unique())
+    months = sorted(
+        df["KPIMonth"]
+        .dropna()
+        .unique()
+    )
 
     selected_month = st.selectbox(
         "📅 Select KPI Month",
@@ -135,17 +172,30 @@ if uploaded_file:
     )
 
     # ===================================
-    # FILTER MONTH DATA
+    # FILTER MONTH
     # ===================================
     df_month = df[
         df["KPIMonth"] == selected_month
     ]
 
     if df_month.empty:
+
         st.warning("No KPI data found.")
         st.stop()
 
-    st.success(f"Loaded KPI data for: {selected_month}")
+    st.success(
+        f"Loaded KPI data for: {selected_month}"
+    )
+
+    # ===================================
+    # TOTAL MONTH RECORDS
+    # ===================================
+    month_total_records = len(df_month)
+
+    st.info(
+        f"📄 Total KPI Records for {selected_month}: "
+        f"{month_total_records}"
+    )
 
     # ===================================
     # KPI ANALYSIS
@@ -164,19 +214,23 @@ if uploaded_file:
 
         with st.expander(f"🔹 {question}"):
 
+            # ===================================
+            # COLUMN CHECK
+            # ===================================
             if col not in df_month.columns:
+
                 st.error(f"Column missing: {col}")
                 continue
 
             # ===================================
-            # CLEAN DATA
+            # CLEAN KPI DATA
             # ===================================
             normalized_series = (
                 df_month[col]
-                .dropna()
+                .fillna("")
                 .astype(str)
                 .str.strip()
-                .str.replace(r'\s+', ' ', regex=True)
+                .str.replace(r"\s+", " ", regex=True)
                 .str.lower()
             )
 
@@ -189,14 +243,20 @@ if uploaded_file:
             ]
 
             # ===================================
-            # CALCULATE KPI
+            # CORRECT RECORDS
             # ===================================
             correct = normalized_series.isin(
                 normalized_valid
             ).sum()
 
-            total = len(normalized_series)
+            # ===================================
+            # USE FIXED TOTAL
+            # ===================================
+            total = month_total_records
 
+            # ===================================
+            # KPI SCORE
+            # ===================================
             percent = (
                 round((correct / total) * 100, 2)
                 if total > 0 else 0
@@ -212,21 +272,34 @@ if uploaded_file:
             # DISPLAY KPI
             # ===================================
             st.metric(
-                label="KPI Score",
-                value=f"{percent}%"
+                "KPI Score",
+                f"{percent}%"
             )
 
             st.progress(percent / 100)
 
-            st.write(f"✅ Valid PASS Values: {valid_values}")
-            st.write(f"✔ Correct Records: {correct}")
-            st.write(f"📄 Total Records: {total}")
+            st.write(
+                f"✅ Valid PASS Values: {valid_values}"
+            )
+
+            st.write(
+                f"✔ Correct Records: {correct}"
+            )
+
+            st.write(
+                f"📄 Total Records: {total}"
+            )
 
             # ===================================
-            # DEBUGGING SECTION
+            # INVALID ENTRIES
             # ===================================
             invalid_entries = normalized_series[
                 ~normalized_series.isin(normalized_valid)
+            ]
+
+            # REMOVE BLANKS FROM INVALIDS
+            invalid_entries = invalid_entries[
+                invalid_entries != ""
             ]
 
             if len(invalid_entries) > 0:
@@ -243,7 +316,7 @@ if uploaded_file:
                     )
 
             # ===================================
-            # EXPORT ROWS
+            # EXPORT DATA
             # ===================================
             export_rows.append({
                 "KPI Question": question,
@@ -267,21 +340,23 @@ if uploaded_file:
     col1, col2 = st.columns(2)
 
     with col1:
+
         st.metric(
             "Overall KPI Score",
             f"{overall}%"
         )
 
     with col2:
+
         st.metric(
             "Total KPI Records",
-            grand_total
+            month_total_records
         )
 
     st.progress(overall / 100)
 
     # ===================================
-    # KPI SUMMARY TABLE
+    # SUMMARY TABLE
     # ===================================
     st.subheader("📋 KPI Summary Table")
 
@@ -325,4 +400,7 @@ if uploaded_file:
     )
 
 else:
-    st.info("Please upload your KPI Excel file.")
+
+    st.info(
+        "Please upload your KPI Excel file."
+    )
