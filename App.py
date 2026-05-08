@@ -2,7 +2,18 @@ import streamlit as st
 import pandas as pd
 import io
 
+# ===================================
+# PAGE CONFIG
+# ===================================
+st.set_page_config(
+    page_title="Nexio KPI Dashboard",
+    page_icon="📊",
+    layout="wide"
+)
 
+# ===================================
+# KPI CONFIGURATION
+# ===================================
 kpi_config = {
     "SMR_Submitted_6to8": {
         "question": "Service Management Report submitted between 6th and 8th day of the immediately following month",
@@ -62,100 +73,256 @@ kpi_config = {
 }
 
 # ===================================
-# STREAMLIT APP LAYOUT
+# TITLE
 # ===================================
-st.set_page_config(page_title="📊 Nexio KPI Dashboard", layout="wide")
-
 st.title("📊 Nexio KPI Analytics Dashboard")
-st.write("Upload the KPI Excel file and select the KPI Month to view performance details.")
-
-uploaded_file = st.file_uploader("Upload tblNexioKPI Excel File", type=["xlsx"])
+st.write("Upload the KPI Excel file and analyze monthly KPI performance.")
 
 # ===================================
-# PROCESS EXCEL FILE
+# FILE UPLOAD
+# ===================================
+uploaded_file = st.file_uploader(
+    "Upload KPI Excel File",
+    type=["xlsx"]
+)
+
+# ===================================
+# PROCESS FILE
 # ===================================
 if uploaded_file:
-    df = pd.read_excel(uploaded_file, sheet_name="tblNexioKPI")
 
-    with st.expander("📅 Select KPI Month"):
-        months = sorted(df["KPIMonth"].dropna().unique())
-        selected_month = st.selectbox("KPI Month", months)
-
-    df_month = df[df["KPIMonth"] == selected_month]
-
-    if df_month.empty:
-        st.warning("No KPI data found for the selected month.")
-    else:
-        st.success(f"KPI data loaded for **{selected_month}**")
-
-        st.subheader("KPI Performance Breakdown (Full Question Descriptions)")
-
-        total_score = 0
-        question_count = len(kpi_config)
-        export_rows = []  # For Excel export
-
-        for col, config in kpi_config.items():
-            long_question = config["question"]
-            valid_values = config["valid"]
-
-            with st.expander(f"🔹 {long_question}"):
-
-                if col in df_month.columns:
-
-                    # ==============================
-                    # CASE-INSENSITIVE MATCHING
-                    # ==============================
-                    normalized_series = df_month[col].astype(str).str.strip().str.lower()
-                    normalized_valid = [v.lower() for v in valid_values]
-
-                    correct = normalized_series.isin(normalized_valid).sum()
-                    total = normalized_series.count()
-
-                    percent = round((correct / total) * 100, 2) if total > 0 else 0
-                    total_score += percent
-
-                    st.metric("KPI Score", f"{percent}%")
-                    st.write(f"**Valid PASS values:** {valid_values}")
-                    st.write(f"Correct: {correct} / {total}")
-
-                    export_rows.append({
-                        "KPI Question": long_question,
-                        "Score (%)": percent,
-                        "Correct": correct,
-                        "Total": total
-                    })
-
-                else:
-                    st.error(f"Column not found: {col}")
-
-        # ==============================
-        # OVERALL KPI SCORE
-        # ==============================
-        overall = round(total_score / question_count, 2)
-
-        st.subheader("⭐ Overall KPI Performance")
-        st.metric(label=f"Overall KPI Score for {selected_month}", value=f"{overall}%")
-
-        # ==============================
-        # EXPORT TO EXCEL
-        # ==============================
-        st.subheader("📁 Export KPI Results to Excel")
-
-        export_df = pd.DataFrame(export_rows)
-        export_df.loc[len(export_df.index)] = ["Overall Score", overall, "", ""]
-
-        towrite = io.BytesIO()
-
-        # Use openpyxl so NO installation required
-        with pd.ExcelWriter(towrite, engine='openpyxl') as writer:
-            export_df.to_excel(writer, index=False, sheet_name="KPI Results")
-
-        st.download_button(
-            label="⬇ Download KPI Results Excel",
-            data=towrite.getvalue(),
-            file_name=f"KPI_Results_{selected_month}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    try:
+        df = pd.read_excel(
+            uploaded_file,
+            sheet_name="tblNexioKPI"
         )
 
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        st.stop()
+
+    # ===================================
+    # CLEAN KPIMonth
+    # ===================================
+    if "KPIMonth" not in df.columns:
+        st.error("KPIMonth column not found.")
+        st.stop()
+
+    # Normalize KPIMonth
+    df["KPIMonth"] = (
+        df["KPIMonth"]
+        .astype(str)
+        .str.strip()
+    )
+
+    # ===================================
+    # REMOVE DUPLICATES
+    # ===================================
+    duplicate_count = df.duplicated().sum()
+
+    if duplicate_count > 0:
+        st.warning(f"⚠ {duplicate_count} duplicate rows detected and removed.")
+        df = df.drop_duplicates()
+
+    # ===================================
+    # MONTH SELECTION
+    # ===================================
+    months = sorted(df["KPIMonth"].dropna().unique())
+
+    selected_month = st.selectbox(
+        "📅 Select KPI Month",
+        months
+    )
+
+    # ===================================
+    # FILTER MONTH DATA
+    # ===================================
+    df_month = df[
+        df["KPIMonth"] == selected_month
+    ]
+
+    if df_month.empty:
+        st.warning("No KPI data found.")
+        st.stop()
+
+    st.success(f"Loaded KPI data for: {selected_month}")
+
+    # ===================================
+    # KPI ANALYSIS
+    # ===================================
+    st.subheader("📌 KPI Performance Breakdown")
+
+    export_rows = []
+
+    grand_correct = 0
+    grand_total = 0
+
+    for col, config in kpi_config.items():
+
+        question = config["question"]
+        valid_values = config["valid"]
+
+        with st.expander(f"🔹 {question}"):
+
+            if col not in df_month.columns:
+                st.error(f"Column missing: {col}")
+                continue
+
+            # ===================================
+            # CLEAN DATA
+            # ===================================
+            normalized_series = (
+                df_month[col]
+                .dropna()
+                .astype(str)
+                .str.strip()
+                .str.replace(r'\s+', ' ', regex=True)
+                .str.lower()
+            )
+
+            # ===================================
+            # CLEAN VALID VALUES
+            # ===================================
+            normalized_valid = [
+                v.lower().strip()
+                for v in valid_values
+            ]
+
+            # ===================================
+            # CALCULATE KPI
+            # ===================================
+            correct = normalized_series.isin(
+                normalized_valid
+            ).sum()
+
+            total = len(normalized_series)
+
+            percent = (
+                round((correct / total) * 100, 2)
+                if total > 0 else 0
+            )
+
+            # ===================================
+            # OVERALL TOTALS
+            # ===================================
+            grand_correct += correct
+            grand_total += total
+
+            # ===================================
+            # DISPLAY KPI
+            # ===================================
+            st.metric(
+                label="KPI Score",
+                value=f"{percent}%"
+            )
+
+            st.progress(percent / 100)
+
+            st.write(f"✅ Valid PASS Values: {valid_values}")
+            st.write(f"✔ Correct Records: {correct}")
+            st.write(f"📄 Total Records: {total}")
+
+            # ===================================
+            # DEBUGGING SECTION
+            # ===================================
+            invalid_entries = normalized_series[
+                ~normalized_series.isin(normalized_valid)
+            ]
+
+            if len(invalid_entries) > 0:
+
+                with st.expander("⚠ View Invalid Entries"):
+
+                    invalid_df = pd.DataFrame({
+                        "Invalid Values": invalid_entries
+                    })
+
+                    st.dataframe(
+                        invalid_df,
+                        use_container_width=True
+                    )
+
+            # ===================================
+            # EXPORT ROWS
+            # ===================================
+            export_rows.append({
+                "KPI Question": question,
+                "Score (%)": percent,
+                "Correct": correct,
+                "Total": total
+            })
+
+    # ===================================
+    # OVERALL KPI
+    # ===================================
+    overall = (
+        round((grand_correct / grand_total) * 100, 2)
+        if grand_total > 0 else 0
+    )
+
+    st.divider()
+
+    st.subheader("⭐ Overall KPI Performance")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.metric(
+            "Overall KPI Score",
+            f"{overall}%"
+        )
+
+    with col2:
+        st.metric(
+            "Total KPI Records",
+            grand_total
+        )
+
+    st.progress(overall / 100)
+
+    # ===================================
+    # KPI SUMMARY TABLE
+    # ===================================
+    st.subheader("📋 KPI Summary Table")
+
+    export_df = pd.DataFrame(export_rows)
+
+    st.dataframe(
+        export_df,
+        use_container_width=True
+    )
+
+    # ===================================
+    # EXPORT TO EXCEL
+    # ===================================
+    st.subheader("📁 Export KPI Results")
+
+    export_df.loc[len(export_df.index)] = [
+        "OVERALL KPI SCORE",
+        overall,
+        grand_correct,
+        grand_total
+    ]
+
+    output = io.BytesIO()
+
+    with pd.ExcelWriter(
+        output,
+        engine="openpyxl"
+    ) as writer:
+
+        export_df.to_excel(
+            writer,
+            index=False,
+            sheet_name="KPI Results"
+        )
+
+    st.download_button(
+        label="⬇ Download KPI Results Excel",
+        data=output.getvalue(),
+        file_name=f"KPI_Results_{selected_month}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 else:
-    st.info("Please upload your Excel file (tblNexioKPI).")
+    st.info("Please upload your KPI Excel file.")
