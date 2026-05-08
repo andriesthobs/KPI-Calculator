@@ -80,7 +80,7 @@ kpi_config = {
         "question": "Minutes circulated within two (2) business days from the date of the QCRS",
         "valid": [
             "Yes",
-            "QCRS not scheduled for current month"
+            "QCSR not scheduled for current month"
         ]
     },
     "QCSR_DocsSaved5Days": {
