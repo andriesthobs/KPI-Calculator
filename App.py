@@ -101,7 +101,8 @@ kpi_config = {
         "question": "SIPS initiated and updated as indicated by the process requirements",
         "valid": [
             "Yes",
-            "no missed sla"
+            "no missed sla",
+            "no sip requirement for the month"
         ]
     },
     "CSIR_Prepared_OnTime": {
